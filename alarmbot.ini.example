@@ -1,0 +1,8 @@
+[config]
+to_channel=#security
+my_name=Alarm Bot NG
+motd=I am monitoring the local sensors and will notify you of important events
+slack_api=zzzz-0000000000-1111111111-22222222222-aabbccddee
+testing=no
+squelch=120
+port=6655

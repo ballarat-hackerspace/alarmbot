@@ -1,0 +1,10 @@
+[Unit]
+Description=Send slack alerts for messages sent from sensor devices on the network
+
+[Service]
+WorkingDirectory=/alarmbot
+ExecStart=/alarmbot/alarmbot.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
