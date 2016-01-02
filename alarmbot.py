@@ -3,6 +3,15 @@
 import select, socket, urllib2, ConfigParser, logging, time
 from slacker import Slacker
 from slacker_log_handler import SlackerLogHandler
+from threading import Timer
+
+def checkAlive():
+  if last_watchdog != 0:
+    if (time.time() - last_watchdog) > 600:
+      logger.panic("no watchdog msg seen for %2.2f minutes!" % ((time.time() - last_watchdog)/60))
+  th = Timer(150.0, checkAlive)
+  th.daemon = True
+  th.start()
 
 config = ConfigParser.RawConfigParser()
 config.read('alarmbot.ini')
@@ -18,6 +27,8 @@ slack = Slacker(config.get('config', 'slack_api'))
 bufferSize = 1024
 lights_on = False
 next_motion_alert_allowed = 0
+last_watchdog = 0
+cur_timer = None
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind(('', port))
@@ -28,6 +39,10 @@ logger = logging.getLogger(__name__)
 
 slack_handler = SlackerLogHandler(config.get('config', 'slack_api'), log_channel, username="alarmbot")
 logger.addHandler(slack_handler)
+
+th = Timer(150.0, checkAlive)
+th.daemon = True
+th.start()
 
 if not testing:
   try:
@@ -41,7 +56,7 @@ else:
 while True:
   result = select.select([s],[],[])
   msg = result[0][0].recv(bufferSize)
-  logger.info("recv:%s" % msg)
+  logger.debug("recv:%s" % msg)
   try:
     [etime, data] = msg.split(' ', 1)
     [channel, argument] = data.split('=')
@@ -92,5 +107,11 @@ while True:
         if lights_on:
           lights_on = False
 
+    elif channel == "ballarathackerspace.org.au/watchdog":
+      last_watchdog = time.time()
+
+    elif channel == "ballarathackerspace.org.au/wifi":
+      pass
+
     else:
-      logger.info("unknown channel: %s" % channel)
+      logger.warn("unknown channel: %s (%s)" % (channel, argument))
