@@ -33,6 +33,7 @@ Eventually we'll have some example code to do the same on an ESP8266 board.
 ```
 [config]
 to_channel=#security
+log_channel=#logging
 my_name=Alarm Bot NG
 motd=I will monitor local sensors and send alerts to this channel
 slack_api=<slack web api key>

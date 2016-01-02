@@ -2,11 +2,13 @@
 
 import select, socket, urllib2, ConfigParser, logging, time
 from slacker import Slacker
+from slacker_log_handler import SlackerLogHandler
 
 config = ConfigParser.RawConfigParser()
 config.read('alarmbot.ini')
 
 to_channel = config.get('config', 'to_channel')
+log_channel = config.get('config', 'log_channel')
 my_name = config.get('config', 'my_name')
 port = config.getint('config', 'port')
 squelch = config.getint('config', 'squelch')
@@ -22,25 +24,29 @@ s.bind(('', port))
 s.setblocking(0)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+logger = logging.getLogger(__name__)
+
+slack_handler = SlackerLogHandler(config.get('config', 'slack_api'), log_channel, username="alarmbot")
+logger.addHandler(slack_handler)
 
 if not testing:
   try:
     slack.chat.post_message(to_channel, '', username=my_name, icon_emoji=':tada:',
       attachments='[ { "color": "#00ff00", "fallback": "I\'m Online and monitoring", "title": "I\'m Online and monitoring", "text": "%s" } ]' % config.get('config', 'motd'))
   except Exception as e:
-    logging.warn("slack.chat.post_message() failed: %s" % e)
+    logger.warn("slack.chat.post_message() failed: %s" % e)
 else:
-  logging.warning("running in test mode")
+  logger.warning("running in test mode")
 
 while True:
   result = select.select([s],[],[])
   msg = result[0][0].recv(bufferSize)
-  logging.info("recv:%s" % msg)
+  logger.info("recv:%s" % msg)
   try:
     [etime, data] = msg.split(' ', 1)
     [channel, argument] = data.split('=')
   except:
-    logging.warn("unknown message format")
+    logger.warn("unknown message format")
     channel = None
 
   if not testing:
@@ -49,20 +55,22 @@ while True:
         slack.chat.post_message(to_channel, '', username=my_name, icon_emoji=':rotating_light:',
           attachments='[ { "color": "#ffaa00", "fallback": "Alarm status", "title": "Alarm Status", "text": "%s" } ]' % (argument))
       except Exception as e:
-        logging.warn("slack.chat.post_message() failed: %s" % e)
+        logger.warn("slack.chat.post_message() failed: %s" % e)
 
     elif channel == "ballarathackerspace.org.au/motion":
       try:
         warmCache = urllib2.urlopen("https://ballarathackerspace.org.au/webcam%s.jpg" % etime).read()
       except:
-        logging.warn("warmcache failed")
+        logger.warn("warmcache failed")
       if time.time() > next_motion_alert_allowed:
-        logging.info("sending motion alert to slack")
+        logger.info("sending motion alert to slack")
         try:
           slack.chat.post_message(to_channel, '', username=my_name, icon_emoji=':rotating_light:',
             attachments='[ { "color": "#ff0000", "fallback": "Motion detected", "title": "Motion Detected", "title_link": "http://axis205.ballarathackerspace.org.au", "image_url": "https://ballarathackerspace.org.au/webcam%s.jpg", "text": "PIR sensor has been tripped %s time(s)." } ]' % (etime, argument))
         except Exception as e:
-          logging.warn("slack.chat.post_message() failed: %s" % e)
+          logger.warn("slack.chat.post_message() failed: %s" % e)
+      else:
+          logger.info("squelched a motion alert")
       next_motion_alert_allowed = time.time() + squelch
 
     elif channel == "ballarathackerspace.org.au/light":
@@ -70,19 +78,19 @@ while True:
       try:
         warmCache = urllib2.urlopen("https://ballarathackerspace.org.au/webcam%s.jpg" % etime).read()
       except:
-        logging.warn("warmcache failed")
+        logger.warn("warmcache failed")
       if argument > 1500:
         if not lights_on:
           lights_on = True
-          logging.info("sending lights detected alert to slack")
+          logger.info("sending lights detected alert to slack")
           try:
             slack.chat.post_message(to_channel, '', username=my_name, icon_emoji=':rotating_light:',
               attachments='[ { "color": "#00ff00", "fallback": "Lights detected", "title": "Lights Detected", "title_link": "http://axis205.ballarathackerspace.org.au", "image_url": "https://ballarathackerspace.org.au/webcam%s.jpg", "text": "LDR sensor has detected bright light (%s)." } ]' % (etime, argument))
           except Exception as e:
-            logging.warn("slack.chat.post_message() failed: %s" % e)
+            logger.warn("slack.chat.post_message() failed: %s" % e)
       if argument < 1000:
         if lights_on:
           lights_on = False
 
     else:
-      logging.info("unknown channel: %s" % channel)
+      logger.info("unknown channel: %s" % channel)
