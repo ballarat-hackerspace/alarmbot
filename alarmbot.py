@@ -8,7 +8,7 @@ from threading import Timer
 def checkAlive():
   if last_watchdog != 0:
     if (time.time() - last_watchdog) > 600:
-      logger.panic("no watchdog msg seen for %2.2f minutes!" % ((time.time() - last_watchdog)/60))
+      logger.critical("no watchdog msg seen for %2.2f minutes!" % ((time.time() - last_watchdog)/60))
   th = Timer(150.0, checkAlive)
   th.daemon = True
   th.start()
@@ -43,6 +43,8 @@ logger.addHandler(slack_handler)
 th = Timer(150.0, checkAlive)
 th.daemon = True
 th.start()
+
+logger.info("alarmbot now monitoring")
 
 if not testing:
   try:
