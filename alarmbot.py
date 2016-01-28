@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import select, socket, urllib2, ConfigParser, logging, time
+import select, socket, urllib2, ConfigParser, logging, time, requests
 from slacker import Slacker
 from slacker_log_handler import SlackerLogHandler
 from threading import Timer
@@ -9,6 +9,14 @@ def checkAlive():
   if last_watchdog != 0:
     if (time.time() - last_watchdog) > 600:
       logger.critical("no watchdog msg seen for %2.2f minutes!" % ((time.time() - last_watchdog)/60))
+      try:
+        if config.get('config', 'spark_core'):
+          url='https://api.particle.io/v1/devices/51ff65065067545737240187/action'
+          data=dict(access_token=config.get('config', 'spark_api'), args='reset')
+          request.post(url, data=data, allow_redirects=True)
+          logger.critical("successfully issued a reset to alarm unit")
+      except:
+        logger.critical("failed to issue a reset to alarm unit")
   th = Timer(150.0, checkAlive)
   th.daemon = True
   th.start()
