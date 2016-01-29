@@ -103,7 +103,7 @@ while True:
       next_motion_alert_allowed = time.time() + squelch
 
     elif channel == "ballarathackerspace.org.au/light":
-      argument = int(argument)
+      argument = int(argument.strip(' \0\t\n'))
       try:
         warmCache = urllib2.urlopen("https://ballarathackerspace.org.au/webcam%s.jpg" % etime).read()
       except:
