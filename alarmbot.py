@@ -42,7 +42,11 @@ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind(('', port))
 s.setblocking(0)
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+if testing:
+  logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
+else:
+  logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+
 logger = logging.getLogger(__name__)
 
 slack_handler = SlackerLogHandler(config.get('config', 'slack_api'), log_channel, username="alarmbot")
@@ -71,7 +75,7 @@ while True:
     [etime, data] = msg.split(' ', 1)
     [channel, argument] = data.split('=')
   except:
-    logger.warn("unknown message format")
+    logger.warn("unknown message format: " + msg)
     channel = None
 
   if not testing:
@@ -118,8 +122,8 @@ while True:
           lights_on = False
 
     elif channel == "ballarathackerspace.org.au/watchdog":
+      logger.info("watch_dog: %s" % argument)
       last_watchdog = time.time()
-      logger.info("%s: %s" % (channel, argument))
 
     elif channel == "ballarathackerspace.org.au/wifi":
       pass
