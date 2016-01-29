@@ -11,12 +11,12 @@ def checkAlive():
       logger.critical("no watchdog msg seen for %2.2f minutes!" % ((time.time() - last_watchdog)/60))
       try:
         if config.get('config', 'spark_core'):
-          url='https://api.particle.io/v1/devices/51ff65065067545737240187/action'
+          url='https://api.particle.io/v1/devices/' + config.get('config', 'spark_core') + '/action'
           data=dict(access_token=config.get('config', 'spark_api'), args='reset')
           request.post(url, data=data, allow_redirects=True)
           logger.critical("successfully issued a reset to alarm unit")
-      except:
-        logger.critical("failed to issue a reset to alarm unit")
+      except e:
+        logger.critical("failed to issue a reset to alarm unit", e)
   th = Timer(150.0, checkAlive)
   th.daemon = True
   th.start()
@@ -119,6 +119,7 @@ while True:
 
     elif channel == "ballarathackerspace.org.au/watchdog":
       last_watchdog = time.time()
+      logger.info("%s: %s" % (channel, argument))
 
     elif channel == "ballarathackerspace.org.au/wifi":
       pass
