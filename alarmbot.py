@@ -5,18 +5,24 @@ from slacker import Slacker
 from slacker_log_handler import SlackerLogHandler
 from threading import Timer
 
+logger = logging.getLogger(__name__)
+
+def rebootCore():
+  logger.warn("Rebooting core")
+  try:
+    if config.get('config', 'spark_core'):
+        url='https://api.particle.io/v1/devices/' + config.get('config', 'spark_core') + '/action'
+        data=dict(access_token=config.get('config', 'spark_api'), args='reset')
+        requests.post(url, data=data, allow_redirects=True)
+        logger.critical("successfully issued a reset to alarm unit")
+  except Exception as e:
+      logger.critical("failed to issue a reset to alarm unit: %s" % e)
+
 def checkAlive():
   if last_watchdog != 0:
     if (time.time() - last_watchdog) > 600:
       logger.critical("no watchdog msg seen for %2.2f minutes!" % ((time.time() - last_watchdog)/60))
-      try:
-        if config.get('config', 'spark_core'):
-          url='https://api.particle.io/v1/devices/' + config.get('config', 'spark_core') + '/action'
-          data=dict(access_token=config.get('config', 'spark_api'), args='reset')
-          request.post(url, data=data, allow_redirects=True)
-          logger.critical("successfully issued a reset to alarm unit")
-      except e:
-        logger.critical("failed to issue a reset to alarm unit", e)
+      rebootCore()
   th = Timer(150.0, checkAlive)
   th.daemon = True
   th.start()
@@ -30,6 +36,7 @@ my_name = config.get('config', 'my_name')
 port = config.getint('config', 'port')
 squelch = config.getint('config', 'squelch')
 testing = config.getboolean('config', 'testing')
+debugging = config.getboolean('config', 'debugging')
 slack = Slacker(config.get('config', 'slack_api'))
 
 bufferSize = 1024
@@ -42,12 +49,11 @@ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind(('', port))
 s.setblocking(0)
 
-if testing:
+if testing or debugging:
   logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
+  rebootCore()
 else:
   logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-
-logger = logging.getLogger(__name__)
 
 slack_handler = SlackerLogHandler(config.get('config', 'slack_api'), log_channel, username="alarmbot")
 logger.addHandler(slack_handler)
@@ -73,10 +79,12 @@ while True:
   logger.debug("recv:%s" % msg)
   try:
     [etime, data] = msg.split(' ', 1)
-    [channel, argument] = data.split('=')
-  except:
-    logger.warn("unknown message format: " + msg)
+    [channel, argument] = data.strip(' \0\t\n').split('=')
+  except Exception as e:
+    logger.warn("unknown message format (%s): %s" % (msg, e))
     channel = None
+
+  logger.debug("etime: %s, channel: %s, argument: %s" % (etime, channel, argument))
 
   if not testing:
     if channel == "ballarathackerspace.org.au/status":
@@ -89,8 +97,8 @@ while True:
     elif channel == "ballarathackerspace.org.au/motion":
       try:
         warmCache = urllib2.urlopen("https://ballarathackerspace.org.au/webcam%s.jpg" % etime).read()
-      except:
-        logger.warn("warmcache failed")
+      except Exception as e:
+        logger.warn("warmcache failed: %s" % e)
       if time.time() > next_motion_alert_allowed:
         logger.info("sending motion alert to slack")
         try:
@@ -103,11 +111,11 @@ while True:
       next_motion_alert_allowed = time.time() + squelch
 
     elif channel == "ballarathackerspace.org.au/light":
-      argument = int(argument.strip(' \0\t\n'))
+      argument = int(argument)
       try:
         warmCache = urllib2.urlopen("https://ballarathackerspace.org.au/webcam%s.jpg" % etime).read()
-      except:
-        logger.warn("warmcache failed")
+      except Exception as e:
+        logger.warn("warmcache failed: %s" % e)
       if argument > 1500:
         if not lights_on:
           lights_on = True
